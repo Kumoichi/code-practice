@@ -1,0 +1,55 @@
+このファイルはコンパイルされません（.go拡張子ではありません）。
+「Badの設計ではMockを差し込めない」ことを示すためのサンプルです。
+
+score_usecase.go で、ScoreUseCase は以下のように定義されています。
+
+    type ScoreUseCase struct {
+        repository *persistence.ScoreRepository
+    }
+
+    func NewScoreUseCase(repository *persistence.ScoreRepository) *ScoreUseCase {
+        ...
+    }
+
+NewScoreUseCase の引数は "*persistence.ScoreRepository" という
+具体的な型で固定されています。interfaceではありません。
+
+ここで、good側と同じようにMockを自作してみます。
+
+    type MockScoreRepository struct {
+        Score *persistence.Score
+        Err   error
+    }
+
+    func (m *MockScoreRepository) Find(id int) (*persistence.Score, error) {
+        if m.Err != nil {
+            return nil, m.Err
+        }
+        return m.Score, nil
+    }
+
+このMockを使ってUseCaseのテストを書こうとすると、次のようになります。
+
+    // このコードはコンパイルできない:
+    //
+    // useCase := NewScoreUseCase(
+    //     &MockScoreRepository{
+    //         Score: &persistence.Score{ID: 1, Value: 120},
+    //     },
+    // )
+    //
+    // コンパイルエラー:
+    // cannot use &MockScoreRepository{…} (value of type *MockScoreRepository)
+    // as *persistence.ScoreRepository value in argument to NewScoreUseCase
+    //
+    // なぜなら NewScoreUseCase は *persistence.ScoreRepository という
+    // 「PostgreSQLの実装そのもの」を要求しており、
+    // MockScoreRepository が同じメソッドセットを持っていても
+    // 型としては全くの別物だからです。
+    //
+    // interfaceを挟んでいれば「Find(id int) (*Score, error) を満たすか」
+    // だけが問われますが、Badでは「persistence.ScoreRepositoryという
+    // 具体的な構造体そのものか」が問われてしまいます。
+
+この結果、Bad側でUseCaseをテストするには、実際にPostgreSQLへ接続する
+score_usecase_test.go のような方法しか残されていません。
