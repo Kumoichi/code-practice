@@ -2,8 +2,8 @@
 // anything from persistence — no database/sql, no driver packages.
 package domain
 
-// Score is a single player's typing score.
-type Score struct {
-	ID    int
-	Value int
+// DiceRoll is a single recorded dice roll.
+type DiceRoll struct {
+	ID   int
+	Pips int
 }

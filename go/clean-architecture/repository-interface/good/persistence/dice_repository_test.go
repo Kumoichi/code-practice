@@ -8,6 +8,9 @@ import (
 	_ "github.com/lib/pq"
 )
 
+// This test hits real PostgreSQL. It requires `docker compose up -d`
+// to have been run from the repository root. Compare with
+// good/application/dice_usecase_test.go, which needs no database at all.
 func openTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 
@@ -29,23 +32,23 @@ func openTestDB(t *testing.T) *sql.DB {
 	return db
 }
 
-func TestScoreRepository_Find_存在するスコアを取得できる(t *testing.T) {
+func TestDiceRepository_Find_存在する目を取得できる(t *testing.T) {
 	db := openTestDB(t)
-	repository := NewScoreRepository(db)
+	repository := NewDiceRepository(db)
 
-	score, err := repository.Find(1)
+	roll, err := repository.Find(1)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if score.ID != 1 || score.Value != 120 {
-		t.Errorf("got %+v, want {ID:1 Value:120}", score)
+	if roll.ID != 1 || roll.Pips != 5 {
+		t.Errorf("got %+v, want {ID:1 Pips:5}", roll)
 	}
 }
 
-func TestScoreRepository_Find_存在しないIDはエラー(t *testing.T) {
+func TestDiceRepository_Find_存在しないIDはエラー(t *testing.T) {
 	db := openTestDB(t)
-	repository := NewScoreRepository(db)
+	repository := NewDiceRepository(db)
 
 	_, err := repository.Find(9999)
 

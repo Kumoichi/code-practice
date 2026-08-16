@@ -1,0 +1,48 @@
+nodi は「DIをそもそも使わない」アンチパターンです。bad と比べても
+一段階悪い状態になっています。
+
+    type DiceUseCase struct {
+        repository *persistence.DiceRepository
+    }
+
+    func NewDiceUseCase() *DiceUseCase {
+        return &DiceUseCase{repository: persistence.NewDefaultDiceRepository()}
+    }
+
+DSNの組み立てやsql.Open自体は persistence.NewDefaultDiceRepository の
+中に移してあります（nodi/persistence/dice_repository.go）。ただし、これは
+見た目が短くなっただけで、問題の本質は変わっていません。application は
+結局 persistence という具体的なパッケージ・具体的な関数名を直接
+呼び出しているので、外から何かを差し込む余地は依然としてゼロです。
+「DSNを組み立てるコードがどのファイルにあるか」ではなく、
+「application が依存先を自分で名指しして作っているか、外から
+受け取るだけか」が本質的な違いだった、ということがこの変更で
+確認できます。
+
+good / bad との違い:
+
+  good: NewDiceUseCase(repository domain.DiceRepository)
+        → interfaceを受け取る。本物もMockも注入できる。
+
+  bad:  NewDiceUseCase(repository *persistence.DiceRepository)
+        → 具体型を受け取る。本物しか注入できないが、少なくとも
+          「どのDBに繋いだrepositoryを渡すか」は呼び出し側が選べる
+          （テスト用DBに向けることもできる）。
+
+  nodi: NewDiceUseCase()
+        → 何も受け取らない。DB接続そのものをUseCaseが自分で
+          os.Getenv("DATABASE_URL") から組み立てる。呼び出し側は
+          「どのDBに繋ぐか」を選ぶ余地すらない。
+
+この結果、nodi では:
+
+  1. Mockを差し込めない（bad と同じ問題）
+  2. テスト用のDBに向けることもできない（bad より悪い）
+  3. DiceUseCase を使う全てのコードが、暗黙的に環境変数
+     DATABASE_URL と接続先DBの存在に依存する
+  4. UseCase（ビジネスロジック）のコードの中に、DB接続やDSNの
+     組み立てといったインフラの都合が混ざり込んでしまっている
+
+DIを使わないと、「テストが書きにくい」だけでなく、
+「そのコードが何に依存しているか」がコンストラクタの外から
+一切見えなくなる、というのがこの例で示したいポイントです。
