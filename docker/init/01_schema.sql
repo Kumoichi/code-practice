@@ -8,12 +8,12 @@ INSERT INTO scores (id, value) VALUES
     (2, 80),
     (3, -10);
 
-CREATE TABLE dice_rolls (
-    id   INTEGER PRIMARY KEY,
-    pips INTEGER NOT NULL
+CREATE TABLE boxes (
+    id     INTEGER PRIMARY KEY,
+    number INTEGER NOT NULL
 );
 
-INSERT INTO dice_rolls (id, pips) VALUES
+INSERT INTO boxes (id, number) VALUES
     (1, 5),
     (2, 2),
     (3, 4);
