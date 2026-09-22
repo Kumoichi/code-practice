@@ -2,8 +2,8 @@
 // anything from persistence — no database/sql, no driver packages.
 package domain
 
-// DiceRoll is a single recorded dice roll.
-type DiceRoll struct {
-	ID   int
-	Pips int
+// Box is a single box's recorded content.
+type Box struct {
+	ID     int
+	Number int
 }
