@@ -2,23 +2,23 @@
 
 テーマ：**UseCaseからInfrastructureの具象Repositoryを直接参照する場合と、Repository interfaceを挟む場合の違い**
 
-Good/Bad/nodiのすべてが、まったく同じ機能（サイコロの出目を取得して4以上かどうか判定する `IsBig(id int) (bool, error)`）を実装しています。実装が違うだけで、外から見た挙動は同じです。
+Good/Bad/nodiのすべてが、まったく同じ機能（箱の中の数字を取得して4以上かどうか判定する `IsLarge(id int) (bool, error)`）を実装しています。実装が違うだけで、外から見た挙動は同じです。
 
 ## Bad
 
 ```text
 UseCase
    ↓
-persistence.DiceRepository
+persistence.BoxRepository
    ↓
 PostgreSQL
 ```
 
-[bad/application/dice_usecase.go](bad/application/dice_usecase.go) を見ると、`DiceUseCase` が `*persistence.DiceRepository` という具体的な型を直接持っています。
+[bad/application/box_usecase.go](bad/application/box_usecase.go) を見ると、`BoxUseCase` が `*persistence.BoxRepository` という具体的な型を直接持っています。
 
 ```go
-type DiceUseCase struct {
-    repository *persistence.DiceRepository
+type BoxUseCase struct {
+    repository *persistence.BoxRepository
 }
 ```
 
@@ -29,39 +29,39 @@ UseCaseは「PostgreSQL実装そのもの」を知っている状態です。た
 ```text
 UseCase
    ↓
-domain.DiceRepository (interface)
+domain.BoxRepository (interface)
    ↑
-persistence.DiceRepository
+persistence.BoxRepository
 ```
 
-[good/application/dice_usecase.go](good/application/dice_usecase.go) では、`DiceUseCase` は `domain.DiceRepository` というinterfaceだけを持っています。
+[good/application/box_usecase.go](good/application/box_usecase.go) では、`BoxUseCase` は `domain.BoxRepository` というinterfaceだけを持っています。
 
 ```go
-type DiceUseCase struct {
-    repository domain.DiceRepository
+type BoxUseCase struct {
+    repository domain.BoxRepository
 }
 ```
 
-UseCaseが知っているのは「`Find(id int) (*DiceRoll, error)` ができるRepositoryが存在する」ということだけです。実装がPostgreSQLなのかMockなのかを知りません。
+UseCaseが知っているのは「`Find(id int) (*Box, error)` ができるRepositoryが存在する」ということだけです。実装がPostgreSQLなのかMockなのかを知りません。
 
 ## nodi（アンチパターン）
 
 ```text
 UseCase
    ↓ (自分でDB接続を組み立てる)
-persistence.DiceRepository
+persistence.BoxRepository
    ↓
 PostgreSQL
 ```
 
-[nodi/application/dice_usecase.go](nodi/application/dice_usecase.go) は、そもそもDI（Dependency Injection）自体をしていません。
+[nodi/application/box_usecase.go](nodi/application/box_usecase.go) は、そもそもDI（Dependency Injection）自体をしていません。
 
 ```go
-func NewDiceUseCase() *DiceUseCase {
+func NewBoxUseCase() *BoxUseCase {
     dsn := os.Getenv("DATABASE_URL")
     db, _ := sql.Open("postgres", dsn)
-    repository := persistence.NewDiceRepository(db)
-    return &DiceUseCase{repository: repository}
+    repository := persistence.NewBoxRepository(db)
+    return &BoxUseCase{repository: repository}
 }
 ```
 
@@ -73,32 +73,32 @@ func NewDiceUseCase() *DiceUseCase {
 
 ### メリット1：UseCaseをDBなしでテストできる
 
-- Good: [good/application/dice_usecase_test.go](good/application/dice_usecase_test.go) は `MockDiceRepository` を使っており、PostgreSQLを一切必要としません。
-- Bad: [bad/application/dice_usecase_test.go](bad/application/dice_usecase_test.go) は `*persistence.DiceRepository` を直接生成するしかないため、テスト実行にPostgreSQLが必須です。
-- nodi: [nodi/application/dice_usecase_test.go](nodi/application/dice_usecase_test.go) はテスト用DBに向けることすらできません（接続先がコンストラクタ内に固定されているため）。
+- Good: [good/application/box_usecase_test.go](good/application/box_usecase_test.go) は `MockBoxRepository` を使っており、PostgreSQLを一切必要としません。
+- Bad: [bad/application/box_usecase_test.go](bad/application/box_usecase_test.go) は `*persistence.BoxRepository` を直接生成するしかないため、テスト実行にPostgreSQLが必須です。
+- nodi: [nodi/application/box_usecase_test.go](nodi/application/box_usecase_test.go) はテスト用DBに向けることすらできません（接続先がコンストラクタ内に固定されているため）。
 
 Badで同じようにMockを差し込もうとすると型が合わずコンパイルできません。実際にコンパイルエラーになる例が [bad/application/try_mock.go](bad/application/try_mock.go) です（このファイルは意図的にコンパイルを失敗させています。詳細は [bad/application/mock_cannot_be_injected.txt](bad/application/mock_cannot_be_injected.txt) を参照）。
 
 ### メリット2：実装を交換できる
 
-Goodでは `domain.DiceRepository` を満たしてさえいれば、UseCaseを変更せずに実装を差し替えられます。
+Goodでは `domain.BoxRepository` を満たしてさえいれば、UseCaseを変更せずに実装を差し替えられます。
 
 ```text
-DiceUseCase
+BoxUseCase
       ↓
-domain.DiceRepository
+domain.BoxRepository
       ↑
  ┌────┴────┐
  ↓         ↓
-persistence.DiceRepository (PostgreSQL)
-MockDiceRepository (テスト用)
+persistence.BoxRepository (PostgreSQL)
+MockBoxRepository (テスト用)
 ```
 
-Badでは `*persistence.DiceRepository` という具体型に固定されているため、別の実装に差し替えるにはUseCase自体を書き換える必要があります。nodiではさらに、接続先DBを差し替える余地すらありません。
+Badでは `*persistence.BoxRepository` という具体型に固定されているため、別の実装に差し替えるにはUseCase自体を書き換える必要があります。nodiではさらに、接続先DBを差し替える余地すらありません。
 
 ### メリット3：Infrastructureの変更がUseCaseに波及しにくい
 
-Goodで `persistence.DiceRepository`（PostgreSQL実装）を書き換えても、`domain.DiceRepository` interfaceさえ満たしていれば `application` パッケージのコードは一切変更不要です。Badでは `persistence` の型そのものにUseCaseが依存しているため、Infrastructure側の変更がUseCaseの型定義にまで波及する可能性があります。
+Goodで `persistence.BoxRepository`（PostgreSQL実装）を書き換えても、`domain.BoxRepository` interfaceさえ満たしていれば `application` パッケージのコードは一切変更不要です。Badでは `persistence` の型そのものにUseCaseが依存しているため、Infrastructure側の変更がUseCaseの型定義にまで波及する可能性があります。
 
 ## 実行方法
 
@@ -142,7 +142,7 @@ PostgreSQLを止めた状態（`docker compose down`）で、以下を実行し�
 go test ./go/clean-architecture/repository-interface/good/application/...
 ```
 
-DBが動いていなくても成功するはずです。これがGoodの`DiceUseCase`がMockだけでテストできている証拠です。
+DBが動いていなくても成功するはずです。これがGoodの`BoxUseCase`がMockだけでテストできている証拠です。
 
 ### Exercise 2: BadはPostgreSQLが必須であることを確認する
 
@@ -154,28 +154,28 @@ go test ./go/clean-architecture/repository-interface/bad/persistence/...
 
 `postgres is required for this test` のようなエラーで失敗するはずです。`docker compose up -d` してから再実行すると成功します。
 
-### Exercise 3: MemoryDiceRepositoryを追加する
+### Exercise 3: MemoryBoxRepositoryを追加する
 
-`good/persistence/dice_repository.go` とは別に、DBを使わないインメモリ実装を自分で追加してみてください。
+`good/persistence/box_repository.go` とは別に、DBを使わないインメモリ実装を自分で追加してみてください。
 
 ```go
-type MemoryDiceRepository struct {
-    rolls map[int]*domain.DiceRoll
+type MemoryBoxRepository struct {
+    boxes map[int]*domain.Box
 }
 
-func (r *MemoryDiceRepository) Find(id int) (*domain.DiceRoll, error) {
+func (r *MemoryBoxRepository) Find(id int) (*domain.Box, error) {
     // ...
 }
 ```
 
-これが `domain.DiceRepository` を満たしていれば、`application.NewDiceUseCase` にそのまま渡せます。`good/application/dice_usecase.go` を一切変更せずに動くことを確認してください。
+これが `domain.BoxRepository` を満たしていれば、`application.NewBoxUseCase` にそのまま渡せます。`good/application/box_usecase.go` を一切変更せずに動くことを確認してください。
 
 ### Exercise 4: コードジャンプで依存関係を追う
 
-VS Codeで `DiceUseCase` の `repository` フィールドから `Find` の呼び出しへ、`Ctrl+Click`（またはF12）でジャンプしてください。
+VS Codeで `BoxUseCase` の `repository` フィールドから `Find` の呼び出しへ、`Ctrl+Click`（またはF12）でジャンプしてください。
 
-- Goodでは `domain.DiceRepository` interfaceの定義にジャンプします。そこから実装（`persistence.DiceRepository` や `MockDiceRepository`）へは、さらに「実装を探す」操作（VS Codeなら `Go to Implementations`）が必要です。
-- Badでは最初から `persistence.DiceRepository` という具体型に直接ジャンプします。
+- Goodでは `domain.BoxRepository` interfaceの定義にジャンプします。そこから実装（`persistence.BoxRepository` や `MockBoxRepository`）へは、さらに「実装を探す」操作（VS Codeなら `Go to Implementations`）が必要です。
+- Badでは最初から `persistence.BoxRepository` という具体型に直接ジャンプします。
 - nodiでは `repository` フィールドを外から渡す箇所自体が存在しません（コンストラクタの中で完結しています）。
 
 このジャンプ先の違いが、「UseCaseが何を知っているか」の違いをそのまま表しています。
