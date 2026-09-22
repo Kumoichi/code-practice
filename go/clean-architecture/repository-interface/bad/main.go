@@ -24,15 +24,15 @@ func main() {
 	}
 	defer db.Close()
 
-	repository := persistence.NewDiceRepository(db)
-	useCase := application.NewDiceUseCase(repository)
+	repository := persistence.NewBoxRepository(db)
+	useCase := application.NewBoxUseCase(repository)
 
 	for _, id := range []int{1, 2, 3} {
-		big, err := useCase.IsBig(id)
+		large, err := useCase.IsLarge(id)
 		if err != nil {
 			fmt.Printf("id=%d error=%v\n", id, err)
 			continue
 		}
-		fmt.Printf("id=%d big=%v\n", id, big)
+		fmt.Printf("id=%d large=%v\n", id, large)
 	}
 }

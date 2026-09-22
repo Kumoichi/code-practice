@@ -1,55 +1,55 @@
 このファイルはコンパイルされません（.go拡張子ではありません）。
 「Badの設計ではMockを差し込めない」ことを示すためのサンプルです。
 
-dice_usecase.go で、DiceUseCase は以下のように定義されています。
+box_usecase.go で、BoxUseCase は以下のように定義されています。
 
-    type DiceUseCase struct {
-        repository *persistence.DiceRepository
+    type BoxUseCase struct {
+        repository *persistence.BoxRepository
     }
 
-    func NewDiceUseCase(repository *persistence.DiceRepository) *DiceUseCase {
+    func NewBoxUseCase(repository *persistence.BoxRepository) *BoxUseCase {
         ...
     }
 
-NewDiceUseCase の引数は "*persistence.DiceRepository" という
+NewBoxUseCase の引数は "*persistence.BoxRepository" という
 具体的な型で固定されています。interfaceではありません。
 
 ここで、good側と同じようにMockを自作してみます。
 
-    type MockDiceRepository struct {
-        Roll *persistence.DiceRoll
-        Err  error
+    type MockBoxRepository struct {
+        Box *persistence.Box
+        Err error
     }
 
-    func (m *MockDiceRepository) Find(id int) (*persistence.DiceRoll, error) {
+    func (m *MockBoxRepository) Find(id int) (*persistence.Box, error) {
         if m.Err != nil {
             return nil, m.Err
         }
-        return m.Roll, nil
+        return m.Box, nil
     }
 
 このMockを使ってUseCaseのテストを書こうとすると、次のようになります。
 
     // このコードはコンパイルできない:
     //
-    // useCase := NewDiceUseCase(
-    //     &MockDiceRepository{
-    //         Roll: &persistence.DiceRoll{ID: 1, Pips: 5},
+    // useCase := NewBoxUseCase(
+    //     &MockBoxRepository{
+    //         Box: &persistence.Box{ID: 1, Number: 5},
     //     },
     // )
     //
     // コンパイルエラー:
-    // cannot use &MockDiceRepository{…} (value of type *MockDiceRepository)
-    // as *persistence.DiceRepository value in argument to NewDiceUseCase
+    // cannot use &MockBoxRepository{…} (value of type *MockBoxRepository)
+    // as *persistence.BoxRepository value in argument to NewBoxUseCase
     //
-    // なぜなら NewDiceUseCase は *persistence.DiceRepository という
+    // なぜなら NewBoxUseCase は *persistence.BoxRepository という
     // 「PostgreSQLの実装そのもの」を要求しており、
-    // MockDiceRepository が同じメソッドセットを持っていても
+    // MockBoxRepository が同じメソッドセットを持っていても
     // 型としては全くの別物だからです。
     //
-    // interfaceを挟んでいれば「Find(id int) (*DiceRoll, error) を満たすか」
-    // だけが問われますが、Badでは「persistence.DiceRepositoryという
+    // interfaceを挟んでいれば「Find(id int) (*Box, error) を満たすか」
+    // だけが問われますが、Badでは「persistence.BoxRepositoryという
     // 具体的な構造体そのものか」が問われてしまいます。
 
 この結果、Bad側でUseCaseをテストするには、実際にPostgreSQLへ接続する
-dice_usecase_test.go のような方法しか残されていません。
+box_usecase_test.go のような方法しか残されていません。

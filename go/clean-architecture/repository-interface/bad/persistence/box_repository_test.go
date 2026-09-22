@@ -29,23 +29,23 @@ func openTestDB(t *testing.T) *sql.DB {
 	return db
 }
 
-func TestDiceRepository_Find_存在する目を取得できる(t *testing.T) {
+func TestBoxRepository_Find_存在する箱を取得できる(t *testing.T) {
 	db := openTestDB(t)
-	repository := NewDiceRepository(db)
+	repository := NewBoxRepository(db)
 
-	roll, err := repository.Find(1)
+	box, err := repository.Find(1)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if roll.ID != 1 || roll.Pips != 5 {
-		t.Errorf("got %+v, want {ID:1 Pips:5}", roll)
+	if box.ID != 1 || box.Number != 5 {
+		t.Errorf("got %+v, want {ID:1 Number:5}", box)
 	}
 }
 
-func TestDiceRepository_Find_存在しないIDはエラー(t *testing.T) {
+func TestBoxRepository_Find_存在しないIDはエラー(t *testing.T) {
 	db := openTestDB(t)
-	repository := NewDiceRepository(db)
+	repository := NewBoxRepository(db)
 
 	_, err := repository.Find(9999)
 

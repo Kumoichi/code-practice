@@ -2,19 +2,19 @@ package application
 
 import "code-practice/go/clean-architecture/repository-interface/bad/persistence"
 
-type MockDiceRepository struct {
-	Roll *persistence.DiceRoll
-	Err  error
+type MockBoxRepository struct {
+	Box *persistence.Box
+	Err error
 }
 
-func (m *MockDiceRepository) Find(id int) (*persistence.DiceRoll, error) {
+func (m *MockBoxRepository) Find(id int) (*persistence.Box, error) {
 	if m.Err != nil {
 		return nil, m.Err
 	}
-	return m.Roll, nil
+	return m.Box, nil
 }
 
 func tryInject() {
-	mock := &MockDiceRepository{Roll: &persistence.DiceRoll{ID: 1, Pips: 5}}
-	_ = NewDiceUseCase(mock)
+	mock := &MockBoxRepository{Box: &persistence.Box{ID: 1, Number: 5}}
+	_ = NewBoxUseCase(mock)
 }
