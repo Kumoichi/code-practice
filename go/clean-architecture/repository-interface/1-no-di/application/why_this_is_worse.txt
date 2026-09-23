@@ -2,12 +2,11 @@
 2-di-concrete と比べても、さらに一段階悪い状態になっています。
 
     type BoxUseCase struct {
-        repository *persistence.CachedBoxRepository
+        repository *persistence.BoxRepository
     }
 
     func NewBoxUseCase() *BoxUseCase {
-        inner := persistence.NewDefaultBoxRepository()
-        return &BoxUseCase{repository: persistence.NewCachedBoxRepository(inner)}
+        return &BoxUseCase{repository: persistence.NewDefaultBoxRepository()}
     }
 
 DSNの組み立てやsql.Open自体は persistence.NewDefaultBoxRepository の
@@ -25,7 +24,7 @@ DSNの組み立てやsql.Open自体は persistence.NewDefaultBoxRepository の
   3-di-interface: NewBoxUseCase(repository domain.BoxRepository)
         → interfaceを受け取る。本物もMockも注入できる。
 
-  2-di-concrete:  NewBoxUseCase(repository *persistence.CachedBoxRepository)
+  2-di-concrete:  NewBoxUseCase(repository *persistence.BoxRepository)
         → 具体型を受け取る。Mockは注入できないが、少なくとも
           「どのDBに繋いだrepositoryを渡すか」は呼び出し側が選べる
           （テスト用DBに向けることもできる）。

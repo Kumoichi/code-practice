@@ -24,8 +24,7 @@ func main() {
 	}
 	defer db.Close()
 
-	// キャッシュを追加したが、application.NewBoxUseCase側は無変更で済む
-	repository := persistence.NewCachedBoxRepository(persistence.NewBoxRepository(db))
+	repository := persistence.NewBoxRepository(db)
 	useCase := application.NewBoxUseCase(repository)
 
 	for _, id := range []int{1, 2, 3} {

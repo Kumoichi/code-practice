@@ -24,9 +24,7 @@ func main() {
 	}
 	defer db.Close()
 
-	// キャッシュを追加した。main.goのこの行だけでなく、
-	// application/box_usecase.go の型定義まで書き換える必要があった。
-	repository := persistence.NewCachedBoxRepository(persistence.NewBoxRepository(db))
+	repository := persistence.NewBoxRepository(db)
 	useCase := application.NewBoxUseCase(repository)
 
 	for _, id := range []int{1, 2, 3} {

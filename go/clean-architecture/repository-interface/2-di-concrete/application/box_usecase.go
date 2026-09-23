@@ -2,20 +2,13 @@ package application
 
 import "code-practice/go/clean-architecture/repository-interface/2-di-concrete/persistence"
 
-// BoxUseCase depends on the concrete *persistence.CachedBoxRepository type,
-// not an interface. It knows this repository is PostgreSQL-backed and cached.
-//
-// キャッシュを追加するために、フィールドの型とコンストラクタの引数の型を
-// *persistence.BoxRepository → *persistence.CachedBoxRepository へ
-// 書き換える必要があった。DIはしているのに、application層のコードに
-// 手を入れる羽目になっている。
-// 比較: 3-di-interface は domain.BoxRepository(interface)のままなので、
-// このファイルを1行も変更せずにキャッシュを差し込めた。
+// BoxUseCase depends on the concrete *persistence.BoxRepository type,
+// not an interface. It knows this repository is PostgreSQL-backed.
 type BoxUseCase struct {
-	repository *persistence.CachedBoxRepository
+	repository *persistence.BoxRepository
 }
 
-func NewBoxUseCase(repository *persistence.CachedBoxRepository) *BoxUseCase {
+func NewBoxUseCase(repository *persistence.BoxRepository) *BoxUseCase {
 	return &BoxUseCase{repository: repository}
 }
 
