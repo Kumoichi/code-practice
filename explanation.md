@@ -18,60 +18,125 @@ DIとはコンストラクタみたいなもの
 
 ### DIを使用しないと何が起こるか
 
-**テストが書きずらい**
+**テストが書きづらい**
 
-1. **テストしやすさ**: `good/application/box_usecase_test.go`はMockを注入するだけでPostgreSQLなしにロジックを検証できました。DIがない`nodi`は、テストのたびに本物のDBが必須でした。
+`IsLarge`が検証したいのは「`Number >= 4`かどうか」という、ただの算数です。本来なら一瞬で終わるはずのこの確認に、DIなし(`1-no-di`)だと本物のPostgreSQLへの接続が毎回必要になります。DIあり(`3-di-interface`)ならMockを注入するだけで、DBを一切使わずに検証できます。
 
-DIありではMockを使うことができる
+この違いが生む具体的な困りごとは3つあります。
 
-DIなしではユースケース層であれ直接DBにつないでテストが行われる
+1. **遅くて不安定**: DB接続はメモリ上の計算より桁違いに遅く、ネットワークやDBの起動状況次第でテストが不安定になる（flakyになる）
+2. **事前準備が要る**: 「id=1の箱には5が入っている」という事実を、DBに事前にINSERT(seed)しておかないとテストが意味をなさない。他のテストがそのデータを書き換えていないことまで保証する必要もある
 
-- 返ってくる期待結果をエラーにしたいときなどに、操作できない
-- ユースケースのテストなのに、DBに接続をするコストの高い処理を行う必要がある
+   たとえばテストコードには`useCase.IsLarge(1)`としか書かれていなくても、これが正しく動くには裏で
 
-`IsLarge`が検証したいのは「`Number >= 4`かどうか」というただの算数です。この算数のロジックを確認するのに、毎回本物のPostgreSQLへのTCP接続が必要になる、というのが不釣り合いなコストなんです。
+   ```sql
+   INSERT INTO boxes (id, number) VALUES (1, 5);
+   ```
 
-### DB版とMock版で何が違うのか
+   のようなseedデータが別ファイル([01_schema.sql](docker/init/01_schema.sql))に存在していないといけません。もし誰かがこのseedデータを`(1, 3)`に変更したら、`IsLarge`自体のロジックは何も壊れていないのに、テストは黙って失敗するようになります。テストコードだけを読んでも「なぜ5という数字を期待しているのか」が分からず、常にDB側のファイルとセットで管理しないといけない、というのがこの「事前準備」の中身です。
+3. **異常系が作れない**: 「DB接続が切れた場合」のようなエラーケースを試したくても、本物のDBを相手に意図的にエラーを起こすのは難しい
 
-「箱1（例えば5が入っている）を選んだら、4以上と認識されて〇となる」というテストを書きたいとき:
-
-- **DB版**: 「箱1の中に実際に5が入っている」という事実を、事前にDB側へ用意（seed）しておかなければならない。テストが「ロジックが正しいか」ではなく「DBの中身がテストの期待と一致しているか」まで検証してしまう。
-- **Mock版**: 「箱を押したら5が返ってくる」という状況を、テストコードの中でその場で作れる。DBの実データが何であろうと関係ない。
+**Mockなら、これらが全部その場で作れます**
 
 ```go
-// Mock: 箱の中身がなんであれ、「5が返ってきたケース」を1行で作れる
+// 「5が返ってくる」状況を、DBの中身に関係なく1行ででっち上げる
 mock := &MockBoxRepository{Box: &domain.Box{ID: 1, Number: 5}}
+
+// 「エラーが返ってくる」状況も同様に作れる
+mock := &MockBoxRepository{Err: errors.New("connection refused")}
 ```
 
-DBだと「id=1の箱には5が入っている」という事実をテストコードとDBの両方が知っていないといけない上に、他のテストがデータを書き換えていないことまで保証しないといけません。
+DBの実データがどうなっているかを気にする必要はなく、「この状況で`IsLarge`は正しく動くか」だけをピンポイントで確認できます。
 
-## DIをしてMockを使うためにはインターフェースが必要になってくる
 
-### Goのinterfaceはテストでどのように役立っているか
+## Mockがあると便利ということはわかったが、どうやったらMockを使えるようになるのか
 
-GoのInterfaceの特徴：暗黙的実装
+インターフェースの実装が必須になってくる。
 
-Goのinterfaceは宣言不要で、必要なメソッド（ここでは`Find(id int) (*domain.Box, error)`）を持ってさえいれば、それだけで`domain.BoxRepository`を満たしたことになる。
+### なぜインターフェースが必須なのか
 
-`MockBoxRepository`も`persistence.BoxRepository`(box_repository.go)も、共に「同じ形のFindを持っている」というだけで、このinterfaceの実装者になれる。
+答えを一言でいうと: **`repository`フィールドの型を具体型で固定してしまうと、そこに入れられる実体は「その具体型そのもの」しか許されず、`Find`を呼んだ瞬間に「その具体型が持つFind」しか使いようがなくなるから**です。Mockが同じ形の`Find`を持っていても、型そのものが違う以上は差し込む余地がありません（`2-di-concrete`で実際に見たコンパイルエラーがこれでした）。
 
-interfaceがなかったらどうなるか:
-
-`bad/application/box_usecase.go`ではrepositoryフィールドが`*persistence.BoxRepository`という具体型に固定されているため、Mockを差し込む余地がない。
-
-結果として`bad/application/box_usecase_test.go`は`openTestDB(t)`で実際にPostgreSQLへ接続してからでないとテストできなくなる。「Applicationのロジック」をテストしたいだけなのに、DBが起動していないとテストができなくなる。
-
-1. **差し替え可能性**: `good/application/box_usecase.go`は`repository`を外から受け取るだけなので、本番用(`persistence.BoxRepository`)・テスト用(`MockBoxRepository`)・将来のインメモリ実装など、コードを変更せずに中身を入れ替えられます。
-
-1. **責務の分離**: ビジネスロジック(`IsLarge`)を書く`application`層が、`sql.Open`やDSNの組み立てといったインフラの都合を知らずに済みます。`nodi`ではこの境界が壊れ、DBの都合が`application`パッケージにまで漏れ出していました。
-
-DIを使わない書き方
-
-```go
-type BoxUseCase struct {
-    repository *persistence.BoxRepository
+こちらのコード
+```
+type MockBoxRepository struct {
+	Box *persistence.Box
+	Err error
 }
 
+func (m *MockBoxRepository) Find(id int) (*persistence.Box, error) {
+	if m.Err != nil {
+		return nil, m.Err
+	}
+	return m.Box, nil
+}
+
+func tryInject() {
+	mock := &MockBoxRepository{Box: &persistence.Box{ID: 1, Number: 5}}
+	_ = NewBoxUseCase(mock)
+}
+```
+
+なので結果として`2-di-concrete/application/box_usecase_test.go`は`openTestDB(t)`で実際にPostgreSQLへ接続してからでないとテストできなくなる。「Applicationのロジック」をテストしたいだけなのに、DBが起動していないとテストができなくなる。
+
+
+`repository`フィールドの型をinterfaceにすると、話が変わります。フィールドが要求するのは「`Find`という形のメソッドを持っていること」だけになるので、**そこに何の具体型を入れるかを、呼び出す側が選べるようになります**。中身が本物のDBでもMockでも、同じ`u.repository.Find(id)`という書き方で、それぞれの実体が持つ`Find`が呼ばれます。
+
+実際にMockを注入したときの流れを追うと、こうなります。
+
+```
+① mock := &MockBoxRepository{...} を生成
+   → 型は *MockBoxRepository（具体型）
+   → Find(id int)(*domain.Box, error) を持つので domain.BoxRepository を実装している
+↓
+② NewBoxUseCase(mock) が呼ばれる
+   引数の型は domain.BoxRepository（ラベルがinterfaceに切り替わる）
+   実体は *MockBoxRepository のまま
+↓
+③ BoxUseCase{repository: mock} が生成される
+   repositoryフィールド: ラベル=domain.BoxRepository、実体=*MockBoxRepository
+↓
+④ useCase.IsLarge(1) を呼ぶ
+↓
+⑤ u.repository.Find(1) が実行される
+   → u.repositoryの実体は*MockBoxRepositoryなので
+   → 実際に動くのは MockBoxRepository.Find
+   → m.Errがnilなので m.Box（{ID:1, Number:5}）をそのまま返す
+↓
+⑥ IsLargeは box.Number(=5) >= 4 を判定 → true
+```
+
+⑤が核心です。`u.repository.Find(1)`という**同じ1行のコード**が、渡された実体次第で「本物のDBに繋ぐFind」にも「Mockが即座に値を返すFind」にもなります。これができるのは、`repository`フィールドがinterface型で「中身が何であってもいい」状態になっているからです。もし具体型で固定されていたら、この1行は「その具体型のFindしか呼べない1行」になってしまい、Mockを混ぜる余地はありません。
+
+
+interfaceを使うと、ここまでの「Mockが使えるかどうか」以外にも2つメリットが出てきます。実際のコードで見てみます。
+
+### メリット1: 差し替え可能性
+
+`3-di-interface/application/box_usecase.go`は`repository`を外から受け取るだけなので、次のどれを渡してもそのまま動きます。
+
+```go
+NewBoxUseCase(persistence.NewBoxRepository(db))                                   // 本番用: 本物のDB
+NewBoxUseCase(&MockBoxRepository{...})                                            // テスト用: Mock
+NewBoxUseCase(persistence.NewCachedBoxRepository(persistence.NewBoxRepository(db))) // キャッシュ付き: 本物のDB + キャッシュ
+```
+
+3つ目は架空の例ではなく、実際にこのリポジトリで起きたことです。あとから「キャッシュを追加したい」となったとき、変更したのは`persistence`パッケージに`CachedBoxRepository`を1つ足したことと、`main.go`で渡す値を差し替えたことだけでした。
+
+```go
+// main.go: 変更前
+repository := persistence.NewBoxRepository(db)
+// main.go: 変更後
+repository := persistence.NewCachedBoxRepository(persistence.NewBoxRepository(db))
+```
+
+`3-di-interface/application/box_usecase.go`と`3-di-interface/domain/box_repository.go`は、この変更で**1行も書き換えていません**。`BoxUseCase`は「`Find`できる何か」を受け取るとしか約束していないので、渡ってくる実体が「本物のDB」から「キャッシュ付きの本物のDB」に変わっても、何も気づかず動き続けます。これが「差し替え可能性」の実例です。
+
+### メリット2: 責務の分離
+
+`1-no-di`版のコンストラクタを見てみます。
+
+```go
 func NewBoxUseCase() *BoxUseCase {
     db, _ := sql.Open("postgres", "postgres://...")       // ← 自分でDB接続を作る
     repo := persistence.NewBoxRepository(db)               // ← 自分でrepositoryを作る
@@ -89,16 +154,28 @@ func (u *BoxUseCase) IsLarge(id int) (bool, error) {
 }
 ```
 
-interfaceをなぜ使用する必要があるのか
+`IsLarge`がやりたいのは「`Number >= 4`かどうか」というビジネスロジックだけのはずです。ところが`NewBoxUseCase`の中には、`sql.Open`や接続文字列(DSN)の組み立てといった、**PostgreSQLというインフラの都合**が入り込んでしまっています。`application`パッケージを読んだ人は、本来知らなくていいはずの「どんなDBに、どんな接続文字列で繋いでいるか」まで目にすることになります。
 
-暗黙的実装:
+`3-di-interface`版はこの境界が保たれています。
 
-Goのinterfaceは宣言不要で、必要なメソッド（ここでは`Find(id int) (*domain.Box, error)`）を持ってさえいれば、それだけで`domain.BoxRepository`を満たしたことになる。
+```go
+func NewBoxUseCase(repository domain.BoxRepository) *BoxUseCase {
+    return &BoxUseCase{repository: repository}
+}
+```
 
-`MockBoxRepository`も`persistence.BoxRepository`(box_repository.go)も、共に「同じ形のFindを持っている」というだけで、このinterfaceの実装者になれる。
+`sql.Open`もDSNも、`application`パッケージのどこにも出てきません。DBに関する知識は全て`persistence`パッケージ側（`main.go`で組み立てる側）に押し込まれていて、`application`層は「`Find`できる何か」を受け取るだけです。これが「責務の分離」で、ビジネスロジックを書く層とインフラに繋ぐ層が、コード上ではっきり切り離されている状態を指します。
 
-interfaceがなかったらどうなるか:
+---
 
-`bad/application/box_usecase.go`ではrepositoryフィールドが`*persistence.BoxRepository`という具体型に固定されているため、Mockを差し込む余地がない。
+## 3つの実装を全部並べて見る
 
-結果として`bad/application/box_usecase_test.go`は`openTestDB(t)`で実際にPostgreSQLへ接続してからでないとテストできなくなる。「Applicationのロジック」をテストしたいだけなのに、DBが起動していないとテストができなくなる。
+ここまでは断片ごとに比較してきましたが、**3つの実装の全コードを層ごとに並べた比較**を [comparison.md](go/clean-architecture/repository-interface/comparison.md) に用意しました。
+
+特に「同じ『キャッシュを追加したい』という要求に対して、3つそれぞれが何ファイル・何行書き換える羽目になったか」の比較は、interfaceの有無が実際の作業量にどう効くかが一番はっきり出る部分です。
+
+| | main.go | application層 | テスト | 新規ファイル |
+|---|---|---|---|---|
+| 3-di-interface | 1行 | **変更なし** | **変更なし** | 1つ |
+| 2-di-concrete | 1行 | 型を2箇所 | 3箇所 | 1つ |
+| 1-no-di | （なし） | 型1箇所＋処理2行 | （元々テスト不能） | （同ファイル内に追加） |
