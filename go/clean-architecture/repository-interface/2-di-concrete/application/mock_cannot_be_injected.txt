@@ -1,5 +1,8 @@
 このファイルはコンパイルされません（.go拡張子ではありません）。
-「2-di-concrete の設計ではMockを差し込めない」ことを示すためのサンプルです。
+「2-di-concrete の設計ではMockを差し込めない」ことを文章で示すためのサンプルです。
+
+実際にコンパイルエラーになる本物のコードは trymock/try_mock.go にあります。
+エディタで開くと赤線が出るので、そちらもあわせて見てください。
 
 box_usecase.go で、BoxUseCase は以下のように定義されています。
 
@@ -39,8 +42,9 @@ NewBoxUseCase の引数は "*persistence.CachedBoxRepository" という
     // )
     //
     // コンパイルエラー:
-    // cannot use &MockBoxRepository{…} (value of type *MockBoxRepository)
-    // as *persistence.CachedBoxRepository value in argument to NewBoxUseCase
+    // cannot use mock (variable of type *MockBoxRepository)
+    // as *persistence.CachedBoxRepository value in argument to
+    // application.NewBoxUseCase
     //
     // なぜなら NewBoxUseCase は *persistence.CachedBoxRepository という
     // 「PostgreSQLの実装をキャッシュで包んだ構造体そのもの」を要求しており、

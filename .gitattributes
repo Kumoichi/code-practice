@@ -1,0 +1,11 @@
+# Goのツールチェーン(gofmt等)はLFを前提にしているため、
+# Windowsでチェックアウトしても改行がCRLFに変換されないようにする。
+# これが無いと gofmt -l が改行コードの違いだけで全ファイルを指摘する。
+*.go text eol=lf
+go.mod text eol=lf
+go.sum text eol=lf
+
+*.md text eol=lf
+*.txt text eol=lf
+*.sql text eol=lf
+*.yml text eol=lf
