@@ -128,7 +128,19 @@ NewBoxUseCase(repository domain.BoxRepository)               // 3-di-interface
 
 ここが一番の見どころです。3つとも**あとからキャッシュ機能を追加**しました。同じ要求に対して、それぞれ何行書き換える羽目になったかを比べます。
 
+この比較は文章だけでなく、**gitのコミットとしても分けてあります**。いったん[3つすべてからキャッシュを取り除いた状態](https://github.com/Kumoichi/code-practice/commit/e188109)を作り、そこから同じ機能をディレクトリごとに1コミットずつ追加し直しました。各コミットの差分がそのまま答えになっているので、GitHubで開いて「変更されたファイルの一覧」を見比べるのが一番早いです。
+
+| 設計 | コミット | 変更 |
+|---|---|---|
+| 3-di-interface | [b5c6223](https://github.com/Kumoichi/code-practice/commit/b5c6223) | 3ファイル（+67/-1） |
+| 2-di-concrete | [2eb75ec](https://github.com/Kumoichi/code-practice/commit/2eb75ec) | 5ファイル（+58/-16） |
+| 1-no-di | [ccde1f3](https://github.com/Kumoichi/code-practice/commit/ccde1f3) | 3ファイル（+38/-5） |
+
+3-di-interfaceの`+67`はほとんどが新規ファイル2つ（キャッシュ実装とそのテスト）で、既存コードへの変更は`-1`が示す通り1行だけ、という内訳です。
+
 ### 3-di-interface: application層は無変更で済んだ
+
+→ [コミット b5c6223](https://github.com/Kumoichi/code-practice/commit/b5c6223)
 
 ```go
 // main.go — この1行だけ変更
@@ -142,11 +154,13 @@ NewBoxUseCase(repository domain.BoxRepository)               // 3-di-interface
 // application/box_usecase_test.go — 変更なし
 ```
 
-新しく追加したのは [3-di-interface/persistence/cached_box_repository.go](3-di-interface/persistence/cached_box_repository.go) という**ファイル1つだけ**です。
+新しく追加したのは [cached_box_repository.go](3-di-interface/persistence/cached_box_repository.go) と [そのテスト](3-di-interface/persistence/cached_box_repository_test.go) の2ファイルだけで、**既存ファイルへの変更は`main.go`の1行のみ**です。コミットをGitHubで開くと、変更ファイルの一覧に`application/box_usecase.go`が**そもそも載っていません**。
 
 なぜ`BoxUseCase`を触らずに済んだのか。`repository`フィールドの型が`domain.BoxRepository`というinterfaceで、`CachedBoxRepository`も`Find`を持っている＝そのinterfaceを満たしているからです。`BoxUseCase`から見れば「`Find`できる何か」が来ることに変わりはなく、それがキャッシュ付きかどうかは関心の外にあります。
 
 ### 2-di-concrete: application層の型定義まで書き換えが必要だった
+
+→ [コミット 2eb75ec](https://github.com/Kumoichi/code-practice/commit/2eb75ec)
 
 ```go
 // main.go
@@ -175,6 +189,8 @@ DIはしているのに、**ビジネスロジックの層とそのテストに�
 
 ### 1-no-di: 同じく application層の書き換えが必要だった
 
+→ [コミット ccde1f3](https://github.com/Kumoichi/code-practice/commit/ccde1f3)
+
 ```go
 // application/box_usecase.go
   type BoxUseCase struct {
@@ -193,11 +209,11 @@ DIはしているのに、**ビジネスロジックの層とそのテストに�
 
 ### 変更範囲まとめ
 
-| | main.go | application層 | テスト | 新規ファイル |
-|---|---|---|---|---|
-| 3-di-interface | 1行 | **変更なし** | **変更なし** | 1つ |
-| 2-di-concrete | 1行 | 型を2箇所 | 3箇所 | 1つ |
-| 1-no-di | （なし） | 型1箇所＋処理2行 | （元々テスト不能） | （同ファイル内に追加） |
+| | main.go | application層 | テスト | 新規ファイル | 実際の差分 |
+|---|---|---|---|---|---|
+| 3-di-interface | 1行 | **変更なし** | **変更なし** | 2つ | [b5c6223](https://github.com/Kumoichi/code-practice/commit/b5c6223) |
+| 2-di-concrete | 1行 | 型を2箇所 | 3箇所 | 1つ | [2eb75ec](https://github.com/Kumoichi/code-practice/commit/2eb75ec) |
+| 1-no-di | （なし） | 型1箇所＋処理2行 | （元々テスト不能） | （同ファイル内に追加） | [ccde1f3](https://github.com/Kumoichi/code-practice/commit/ccde1f3) |
 
 ---
 

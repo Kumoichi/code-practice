@@ -85,9 +85,9 @@ UseCaseが知っているのは「`Find(id int) (*Box, error)` ができるRepos
 
 2-di-concreteで同じようにMockを差し込もうとすると型が合わずコンパイルできません。実際にコンパイルエラーになる例が [2-di-concrete/application/try_mock.go](2-di-concrete/application/try_mock.go) です（このファイルは意図的にコンパイルを失敗させています。詳細は [2-di-concrete/application/mock_cannot_be_injected.txt](2-di-concrete/application/mock_cannot_be_injected.txt) を参照）。
 
-### メリット2：実装を交換できる
+### メリット2：中身を入れ替えられる（ただし主目的はテスト）
 
-3-di-interfaceでは `domain.BoxRepository` を満たしてさえいれば、UseCaseを変更せずに実装を差し替えられます。
+3-di-interfaceでは `domain.BoxRepository` を満たしてさえいれば、UseCaseを変更せずに中身を入れ替えられます。
 
 ```text
 BoxUseCase
@@ -96,16 +96,30 @@ domain.BoxRepository
       ↑
  ┌────┼────────────┐
  ↓    ↓            ↓
-persistence.BoxRepository (PostgreSQL)
-persistence.CachedBoxRepository (キャッシュ付き)
-MockBoxRepository (テスト用)
+persistence.BoxRepository (PostgreSQL)            ← 本番
+persistence.CachedBoxRepository (キャッシュ付き)    ← 本番（デコレータ）
+MockBoxRepository (テスト用)                       ← テスト
 ```
+
+ただし実務でこのうち日常的に使われるのは、**一番下のテスト用への入れ替え**です。「interfaceにしておけば、あとから別のDBに乗り換えられる」という説明をよく見かけますが、実際にそれが起きることはめったにありません。なので「将来差し替えるかもしれないから」を理由にinterfaceを切るのは、動機としては弱いです（Goには「必要になるまでinterfaceを作るな」という文化もあります）。
+
+入れ替えそのものより実際に効いてくるのは、次のメリット3です。
 
 2-di-concreteでは `*persistence.CachedBoxRepository` という具体型に固定されているため、別の実装に差し替えるにはUseCase自体を書き換える必要があります。1-no-diではさらに、接続先DBを差し替える余地すらありません。
 
 ### メリット3：Infrastructureの変更がUseCaseに波及しにくい
 
-これは実際にキャッシュ機能を後から追加して検証しました。3-di-interfaceでは `main.go` の1行を変えただけで、`application` パッケージには一切手を入れずに済みました。一方、2-di-concreteと1-no-diでは `application/box_usecase.go` の型定義まで書き換える必要がありました。変更範囲の比較は [comparison.md](comparison.md) を参照してください。
+これは実際にキャッシュ機能を後から追加して検証しました。3-di-interfaceでは `main.go` の1行を変えただけで、`application` パッケージには一切手を入れずに済みました。一方、2-di-concreteと1-no-diでは `application/box_usecase.go` の型定義まで書き換える必要がありました。
+
+検証は文章だけでなく、gitのコミットとしても分けてあります。いったん[3つすべてからキャッシュを取り除いた状態](https://github.com/Kumoichi/code-practice/commit/e188109)を作り、そこから同じ機能をディレクトリごとに1コミットずつ追加し直したので、**各コミットの差分がそのまま「その設計で同じ機能を足すのに何を書き換える羽目になるか」の答え**になっています。
+
+| 設計 | 実際の差分 | 変更 |
+|---|---|---|
+| [3-di-interface](3-di-interface/) | [b5c6223](https://github.com/Kumoichi/code-practice/commit/b5c6223) | 3ファイル（+67/-1）。既存コードの変更は`main.go`の1行だけ |
+| [2-di-concrete](2-di-concrete/) | [2eb75ec](https://github.com/Kumoichi/code-practice/commit/2eb75ec) | 5ファイル（+58/-16）。application層とテストにも波及 |
+| [1-no-di](1-no-di/) | [ccde1f3](https://github.com/Kumoichi/code-practice/commit/ccde1f3) | 3ファイル（+38/-5）。application層の型とコンストラクタを変更 |
+
+変更範囲の詳しい比較は [comparison.md](comparison.md) を参照してください。
 
 ## 実行方法
 
