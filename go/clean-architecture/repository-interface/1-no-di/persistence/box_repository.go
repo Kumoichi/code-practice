@@ -38,6 +38,32 @@ func NewDefaultBoxRepository() *BoxRepository {
 	return NewBoxRepository(db)
 }
 
+// CachedBoxRepositoryはBoxRepositoryをラップしてキャッシュを追加する。
+// innerがinterfaceではなく*BoxRepositoryという具体型なので、テスト用のフェイクを
+// 包むことはできず、本物のBoxRepository(=本物のDB接続)しか渡せない。
+type CachedBoxRepository struct {
+	inner *BoxRepository
+	cache map[int]*Box
+}
+
+func NewCachedBoxRepository(inner *BoxRepository) *CachedBoxRepository {
+	return &CachedBoxRepository{inner: inner, cache: map[int]*Box{}}
+}
+
+func (r *CachedBoxRepository) Find(id int) (*Box, error) {
+	if box, ok := r.cache[id]; ok {
+		return box, nil
+	}
+
+	box, err := r.inner.Find(id)
+	if err != nil {
+		return nil, err
+	}
+
+	r.cache[id] = box
+	return box, nil
+}
+
 func (r *BoxRepository) Find(id int) (*Box, error) {
 	row := r.db.QueryRow(`SELECT id, number FROM boxes WHERE id = $1`, id)
 

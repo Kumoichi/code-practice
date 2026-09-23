@@ -6,13 +6,19 @@ package application
 
 import "code-practice/go/clean-architecture/repository-interface/1-no-di/persistence"
 
+// キャッシュを追加するために、フィールドの型自体を
+// *persistence.BoxRepository → *persistence.CachedBoxRepository へ
+// 書き換える必要があった。ここが3-di-interfaceとの決定的な違い:
+// 3-di-interfaceはdomain.BoxRepository(interface)のままなので、この構造体定義に
+// 一切手を入れずにCachedBoxRepositoryを差し込めた。
 type BoxUseCase struct {
-	repository *persistence.BoxRepository
+	repository *persistence.CachedBoxRepository
 }
 
 // DIをしていない: 引数が0個で、persistenceの具体的な関数を名指しで呼んでいる。
 func NewBoxUseCase() *BoxUseCase {
-	return &BoxUseCase{repository: persistence.NewDefaultBoxRepository()}
+	inner := persistence.NewDefaultBoxRepository()
+	return &BoxUseCase{repository: persistence.NewCachedBoxRepository(inner)}
 }
 
 // IsLarge reports whether the number in the box identified by id is 4 or higher.
