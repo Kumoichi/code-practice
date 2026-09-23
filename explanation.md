@@ -1,8 +1,36 @@
 ## DIとはなにか
+DI（Dependency Injection）とは、オブジェクトが必要とする依存先を、自分自身で生成するのではなく、外側から渡してもらう設計のこと。
 
-DIとはコンストラクタみたいなもの。
+実際のコードで見てみます。`BoxUseCase`は「`repository`という依存先」を必要としています。
 
-振る舞い（メソッド）を持っていて、代わりに何かをやってくれるものを入れるとDIになる。
+**自分自身で生成している例（[1-no-di/application/box_usecase.go](go/clean-architecture/repository-interface/1-no-di/application/box_usecase.go)）**
+
+```go
+func NewBoxUseCase() *BoxUseCase {
+	inner := persistence.NewDefaultBoxRepository()                    // ← ここが「自分自身で生成」
+	return &BoxUseCase{repository: persistence.NewCachedBoxRepository(inner)}
+}
+```
+
+`NewBoxUseCase`は引数を受け取っていません。必要な`repository`を、関数の中で自分から`persistence.NewDefaultBoxRepository()`を呼んで作っています。外部の誰かに頼らず、依存先を自給自足している状態です。
+
+**外側から渡してもらっている例（[3-di-interface/application/box_usecase.go](go/clean-architecture/repository-interface/3-di-interface/application/box_usecase.go)）**
+
+```go
+func NewBoxUseCase(repository domain.BoxRepository) *BoxUseCase {   // ← ここが「外側から渡してもらう」
+	return &BoxUseCase{repository: repository}
+}
+```
+
+`NewBoxUseCase`は`repository`を**引数として受け取っています**。この関数自身は`persistence.NewBoxRepository`のような具体的な生成コードを一切書いておらず、「呼び出す側が用意した`repository`をそのまま使う」だけです。実際に何を渡すかは、呼び出し側（[main.go](go/clean-architecture/repository-interface/3-di-interface/main.go)）が決めます。
+
+```go
+// main.go（呼び出す側）
+repository := persistence.NewCachedBoxRepository(persistence.NewBoxRepository(db))  // ← ここで生成
+useCase := application.NewBoxUseCase(repository)                                     // ← ここで渡す
+```
+
+この「生成する場所」と「使う場所」が分離していることが、DIの実体です。この文書は、この1点の違いが実際に何を引き起こすかを、以降で具体的に見ていきます。
 
 ## DIの特徴
 
@@ -299,3 +327,123 @@ func NewBoxUseCase() *BoxUseCase {
 これとは別に、**3つのapplication層の全文を層ごとに並べた比較**を comparison.md に用意しています。
 
 `IsLarge`の中身は3つとも1文字も違わず、違うのは`import`先と`repository`フィールドの型だけ、という事実から出発して、テストの書き方の差や依存の向きの図まで通しで追える構成にしてあります。
+## Wireとは
+
+ここまでの`3-di-interface`では、依存の組み立てを`main.go`に手で書いていました。
+
+```go
+repository := persistence.NewCachedBoxRepository(persistence.NewBoxRepository(db))
+useCase := application.NewBoxUseCase(repository)
+```
+
+Goの実務でDIというと、この「組み立て」を自動化する[Wire](https://github.com/google/wire)（Google製）の名前がよく出てきます。
+
+### まず誤解しやすい点: WireはDIそのものではない
+
+冒頭で書いた通り、DIの実体は「生成する場所と使う場所を分ける」ことで、それは**コンストラクタで引数を受け取る**だけで成立します。`3-di-interface`はWireなしですでにDIできています。
+
+Wireがやるのは、その先の**「組み立て作業（上の2行）の自動化」**だけです。
+
+|  | 何をするものか | このリポジトリでは |
+| --- | --- | --- |
+| DI（設計） | 依存を引数で受け取る | `NewBoxUseCase(repository)`の形 |
+| Wire（道具） | 依存の組み立てコードを自動生成する | 使っていない |
+
+つまり「interfaceを切る」「引数で受け取る」というここまでの話が土台で、Wireはその上に乗るオプションです。Wireを入れてもUseCaseやRepositoryのコードは変わりません。
+
+### 何が困るからWireがあるのか
+
+依存が2〜3個なら、`main.go`に手で書けば十分です。困るのは、依存が増えてきたときです。
+
+```go
+// 依存が増えると、組み立ての順番と受け渡しを全部手で書くことになる
+db := openDB()
+logger := newLogger()
+boxRepo := persistence.NewCachedBoxRepository(persistence.NewBoxRepository(db))
+userRepo := persistence.NewUserRepository(db)
+boxUseCase := application.NewBoxUseCase(boxRepo, logger)
+userUseCase := application.NewUserUseCase(userRepo, logger)
+handler := http.NewHandler(boxUseCase, userUseCase)
+```
+
+コンストラクタの引数が1つ増えるたびに、この組み立てコードを直す必要があり、順番（`db`を先に作る等）も自分で管理します。Wireは「どの型をどの関数で作れるか」を宣言しておくと、**必要な順番を解決して組み立てコードを生成してくれる**ツールです。
+
+### Wireの使い方（このリポジトリに当てはめると）
+
+Wireは3つの概念でできています。
+
+1. **provider**: 「この型を作る関数」のこと。`NewBoxRepository`や`NewBoxUseCase`など、すでにあるコンストラクタがそのままproviderになる
+2. **injector**: 「最終的に欲しい型を得るための関数」。中身は書かず、`wire.Build`にproviderを並べるだけ
+3. **`wire`コマンド**: injectorを読み、実際の組み立てコード（`wire_gen.go`）を生成する
+
+```go
+// wire.go — 人間が書く。「BoxUseCaseが欲しい。材料はこれ」と宣言するだけ
+//go:build wireinject
+
+package main
+
+import "github.com/google/wire"
+
+func InitializeBoxUseCase(db *sql.DB) *application.BoxUseCase {
+	wire.Build(
+		persistence.NewBoxRepository,
+		newCachedRepository,
+		application.NewBoxUseCase,
+	)
+	return nil // 実際には実行されない。型の指定のためだけに書く
+}
+```
+
+`wire`コマンドを実行すると、次のような`wire_gen.go`が生成されます。
+
+```go
+// wire_gen.go — 自動生成。手で編集しない
+func InitializeBoxUseCase(db *sql.DB) *application.BoxUseCase {
+	boxRepository := persistence.NewBoxRepository(db)
+	domainBoxRepository := newCachedRepository(boxRepository)
+	boxUseCase := application.NewBoxUseCase(domainBoxRepository)
+	return boxUseCase
+}
+```
+
+生成されるのは、先ほど`main.go`に手で書いていた組み立てと同じ内容の、**ただのGoコード**です。実行時に何かが動的に解決されるわけではなく、コンパイル前に生成されたコードがそのまま使われます。そのため、依存が足りなければ`wire`コマンドの時点でエラーになり、実行時のリフレクションによる遅さも、DIコンテナ特有の「動かして初めて気づく」問題もありません。これがWireが選ばれる主な理由です。
+
+### この題材で実際にWireを使うときの落とし穴
+
+`3-di-interface`の`CachedBoxRepository`はそのままではWireと相性が悪い部分があります。
+
+```go
+func NewCachedBoxRepository(inner domain.BoxRepository) *CachedBoxRepository
+```
+
+`CachedBoxRepository`は「`domain.BoxRepository`を受け取って、`domain.BoxRepository`として振る舞う」（デコレータ）ため、次のように書きたくなりますが動きません。
+
+```go
+wire.Bind(new(domain.BoxRepository), new(*persistence.CachedBoxRepository))
+```
+
+これだと「`domain.BoxRepository`を作るには`*CachedBoxRepository`が必要で、それを作るには`domain.BoxRepository`が必要」という**循環**になり、Wireはエラーにします。Wireは「1つのinterface型に対して、providerが1つ」でないと組み立てられないためです。
+
+回避策は、上の例で使った`newCachedRepository`のような**「素のRepositoryを受け取ってキャッシュ付きのinterfaceを返す」小さなprovider関数を自分で書く**ことです。
+
+```go
+func newCachedRepository(inner *persistence.BoxRepository) domain.BoxRepository {
+	return persistence.NewCachedBoxRepository(inner)
+}
+```
+
+「どのinterfaceにどの実装を割り当てるか」の判断は、Wireを使っても結局人間が書く必要があります。Wireが自動化するのは**判断の後の、順番解決と受け渡しの配線だけ**です。
+
+### 使うべきか
+
+正直に言うと、このリポジトリの規模（依存が`db` → `repository` → `useCase`の3つ）では、Wireは**過剰**です。`main.go`の2行を手で書くほうが読みやすく、Wireを入れるとむしろ`wire.go`・`wire_gen.go`・`wire`コマンドの実行という手間が増えます。
+
+Wireが効いてくるのは次のようなときです。
+
+- 依存が数十個あり、`main.go`の組み立てが長く、順番管理が負担になっている
+- コンストラクタの引数が頻繁に変わり、そのたびに組み立てコードを直すのが面倒
+- 組み立て漏れ・循環をコンパイル前に機械的に検出したい
+
+逆に言えば、**「DIをしているか」と「Wireを使っているか」は別の話**です。Wireを使っていなくても、コンストラクタで受け取っていればDIはできています。この文書で確認してきた「テストでMockを差し替えられる」「決定権が呼び出す側にある」といった効果も、Wireなしで得られます。
+
+なお、同じ目的のツールとして、実行時にリフレクションで解決する`uber-go/fx`（`dig`）などもあります。ただ、どれを選ぶにしても土台となる「interfaceを切ってコンストラクタで受け取る」設計は共通です。
