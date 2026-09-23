@@ -8,8 +8,8 @@ import "code-practice/go/clean-architecture/repository-interface/1-no-di/persist
 
 // キャッシュを追加するために、フィールドの型自体を
 // *persistence.BoxRepository → *persistence.CachedBoxRepository へ
-// 書き換える必要があった。ここがgoodとの決定的な違い:
-// goodはdomain.BoxRepository(interface)のままなので、この構造体定義に
+// 書き換える必要があった。ここが3-di-interfaceとの決定的な違い:
+// 3-di-interfaceはdomain.BoxRepository(interface)のままなので、この構造体定義に
 // 一切手を入れずにCachedBoxRepositoryを差し込めた。
 type BoxUseCase struct {
 	repository *persistence.CachedBoxRepository
