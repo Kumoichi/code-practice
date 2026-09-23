@@ -83,7 +83,7 @@ UseCaseが知っているのは「`Find(id int) (*Box, error)` ができるRepos
 - 2-di-concrete: [2-di-concrete/application/box_usecase_test.go](2-di-concrete/application/box_usecase_test.go) は `*persistence.CachedBoxRepository` を直接生成するしかないため、テスト実行にPostgreSQLが必須です。
 - 1-no-di: [1-no-di/application/box_usecase_test.go](1-no-di/application/box_usecase_test.go) はテスト用DBに向けることすらできません（接続先がコンストラクタ内に固定されているため）。
 
-2-di-concreteで同じようにMockを差し込もうとすると型が合わずコンパイルできません。実際にコンパイルエラーになる例が [2-di-concrete/application/try_mock.go](2-di-concrete/application/try_mock.go) です（このファイルは意図的にコンパイルを失敗させています。詳細は [2-di-concrete/application/mock_cannot_be_injected.txt](2-di-concrete/application/mock_cannot_be_injected.txt) を参照）。
+2-di-concreteで同じようにMockを差し込もうとすると型が合わずコンパイルできません。実際にコンパイルエラーになる例が [2-di-concrete/application/trymock/try_mock.go](2-di-concrete/application/trymock/try_mock.go) です（このファイルは意図的にコンパイルを失敗させています。詳細は [2-di-concrete/application/mock_cannot_be_injected.txt](2-di-concrete/application/mock_cannot_be_injected.txt) を参照）。
 
 ### メリット2：中身を入れ替えられる（ただし主目的はテスト）
 
@@ -135,22 +135,18 @@ docker compose up -d
 go test ./...
 ```
 
-3-di-interfaceの実行：
+このとき `2-di-concrete/application/trymock` だけは必ずビルドエラーになります。**これは意図した挙動です**（「Mockを差し込めない」ことを実際のコンパイルエラーで示すためのパッケージなので）。それ以外のパッケージのテスト結果を見てください。エラーを出さずに実行したい場合は、そのパッケージを除外します。
 
 ```bash
-go run ./go/clean-architecture/repository-interface/3-di-interface
+go test $(go list ./... | grep -v trymock)
 ```
 
-2-di-concreteの実行（`2-di-concrete/application` には意図的にコンパイルエラーになる `try_mock.go` が置いてあるため、パッケージ指定の `go run` はエラーになります。`main.go` 単体で試す場合は下記）：
-
-```bash
-go run ./go/clean-architecture/repository-interface/2-di-concrete/main.go
-```
-
-1-no-diの実行：
+3つの実装の実行（3つとも同じ結果 `id=1 large=true` / `id=2 large=false` / `id=3 large=true` が出ます）：
 
 ```bash
 go run ./go/clean-architecture/repository-interface/1-no-di
+go run ./go/clean-architecture/repository-interface/2-di-concrete
+go run ./go/clean-architecture/repository-interface/3-di-interface
 ```
 
 ## 演習

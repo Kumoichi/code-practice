@@ -213,7 +213,9 @@ DIはしているのに、**ビジネスロジックの層とそのテストに�
 |---|---|---|---|---|---|
 | 3-di-interface | 1行 | **変更なし** | **変更なし** | 2つ | [b5c6223](https://github.com/Kumoichi/code-practice/commit/b5c6223) |
 | 2-di-concrete | 1行 | 型を2箇所 | 3箇所 | 1つ | [2eb75ec](https://github.com/Kumoichi/code-practice/commit/2eb75ec) |
-| 1-no-di | （なし） | 型1箇所＋処理2行 | （元々テスト不能） | （同ファイル内に追加） | [ccde1f3](https://github.com/Kumoichi/code-practice/commit/ccde1f3) |
+| 1-no-di | （なし） | 型1箇所＋処理2行 | **変更なし**（※） | （同ファイル内に追加） | [ccde1f3](https://github.com/Kumoichi/code-practice/commit/ccde1f3) |
+
+※ 1-no-diのテストが変更不要だったのは、3-di-interfaceとは理由が正反対です。3-di-interfaceは「interfaceが変更を吸収したから」ですが、1-no-diは「`NewBoxUseCase()`に引数が無く、そもそも渡すものが無いから」です。テスト自体は存在しますが、Mockを渡す余地も接続先を変える余地もありません。
 
 ---
 
@@ -251,7 +253,7 @@ func TestBoxUseCase_IsLarge_5は4以上なのでtrue(t *testing.T) {
 }
 ```
 
-Mockを渡そうとするとコンパイルエラーになります。実際に試したコードが [2-di-concrete/application/try_mock.go](2-di-concrete/application/try_mock.go) にあり、`go build`すると必ず次のエラーが出ます（このファイルは意図的にコンパイルを失敗させています）。
+Mockを渡そうとするとコンパイルエラーになります。実際に試したコードが [2-di-concrete/application/trymock/try_mock.go](2-di-concrete/application/trymock/try_mock.go) にあり、`go build`すると必ず次のエラーが出ます（このファイルは意図的にコンパイルを失敗させています）。
 
 ```
 cannot use mock (variable of type *MockBoxRepository)
