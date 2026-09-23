@@ -1,6 +1,6 @@
 package application
 
-import "code-practice/go/clean-architecture/repository-interface/good/domain"
+import "code-practice/go/clean-architecture/repository-interface/3-di-interface/domain"
 
 // repositoryはinterfaceなので、BoxUseCaseは中身が本物のDBなのかMockなのかを知らない
 type BoxUseCase struct {

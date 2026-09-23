@@ -1,6 +1,6 @@
 package persistence
 
-import "code-practice/go/clean-architecture/repository-interface/good/domain"
+import "code-practice/go/clean-architecture/repository-interface/3-di-interface/domain"
 
 // CachedBoxRepositoryはdomain.BoxRepositoryをラップしてキャッシュを追加する。
 // innerもdomain.BoxRepository型(interface)なので、本物のBoxRepositoryだけでなく

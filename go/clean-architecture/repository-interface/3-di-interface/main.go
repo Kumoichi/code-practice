@@ -8,8 +8,8 @@ import (
 
 	_ "github.com/lib/pq"
 
-	"code-practice/go/clean-architecture/repository-interface/bad/application"
-	"code-practice/go/clean-architecture/repository-interface/bad/persistence"
+	"code-practice/go/clean-architecture/repository-interface/3-di-interface/application"
+	"code-practice/go/clean-architecture/repository-interface/3-di-interface/persistence"
 )
 
 func main() {
@@ -24,7 +24,8 @@ func main() {
 	}
 	defer db.Close()
 
-	repository := persistence.NewBoxRepository(db)
+	// キャッシュを追加したが、application.NewBoxUseCase側は無変更で済む
+	repository := persistence.NewCachedBoxRepository(persistence.NewBoxRepository(db))
 	useCase := application.NewBoxUseCase(repository)
 
 	for _, id := range []int{1, 2, 3} {

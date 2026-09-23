@@ -3,7 +3,7 @@ package persistence
 import (
 	"testing"
 
-	"code-practice/go/clean-architecture/repository-interface/good/domain"
+	"code-practice/go/clean-architecture/repository-interface/3-di-interface/domain"
 )
 
 // countingBoxRepositoryはdomain.BoxRepositoryを満たすだけのテスト用フェイク。

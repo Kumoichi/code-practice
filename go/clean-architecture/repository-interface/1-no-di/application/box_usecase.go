@@ -1,10 +1,10 @@
 // Package application demonstrates the "no DI" anti-pattern: BoxUseCase
 // builds its own dependency instead of receiving one from outside.
-// Compare with good/application/box_usecase.go (DI + interface) and
-// bad/application/box_usecase.go (DI + concrete type).
+// Compare with 3-di-interface/application/box_usecase.go (DI + interface) and
+// 2-di-concrete/application/box_usecase.go (DI + concrete type).
 package application
 
-import "code-practice/go/clean-architecture/repository-interface/nodi/persistence"
+import "code-practice/go/clean-architecture/repository-interface/1-no-di/persistence"
 
 // キャッシュを追加するために、フィールドの型自体を
 // *persistence.BoxRepository → *persistence.CachedBoxRepository へ

@@ -8,8 +8,8 @@ import (
 
 	_ "github.com/lib/pq"
 
-	"code-practice/go/clean-architecture/repository-interface/good/application"
-	"code-practice/go/clean-architecture/repository-interface/good/persistence"
+	"code-practice/go/clean-architecture/repository-interface/2-di-concrete/application"
+	"code-practice/go/clean-architecture/repository-interface/2-di-concrete/persistence"
 )
 
 func main() {
@@ -24,7 +24,8 @@ func main() {
 	}
 	defer db.Close()
 
-	// キャッシュを追加したが、application.NewBoxUseCase側は無変更で済む
+	// キャッシュを追加した。main.goのこの行だけでなく、
+	// application/box_usecase.go の型定義まで書き換える必要があった。
 	repository := persistence.NewCachedBoxRepository(persistence.NewBoxRepository(db))
 	useCase := application.NewBoxUseCase(repository)
 

@@ -7,13 +7,17 @@ import (
 
 	_ "github.com/lib/pq"
 
-	"code-practice/go/clean-architecture/repository-interface/bad/persistence"
+	"code-practice/go/clean-architecture/repository-interface/2-di-concrete/persistence"
 )
 
-// Unlike good/application/box_usecase_test.go, this test cannot use a
-// mock: NewBoxUseCase only accepts *persistence.BoxRepository, so the
+// Unlike 3-di-interface/application/box_usecase_test.go, this test cannot use
+// a mock: NewBoxUseCase only accepts *persistence.CachedBoxRepository, so the
 // only way to exercise IsLarge is through a real PostgreSQL instance.
 // See mock_cannot_be_injected.txt for what happens if you try.
+//
+// さらに、キャッシュを追加した際にNewBoxUseCaseの引数の型が変わったため、
+// このファイル内の呼び出し3箇所すべてを書き換える必要があった。
+// 3-di-interface側はinterfaceを挟んでいるので、テストコードも無変更で済んでいる。
 func openTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 
@@ -37,7 +41,7 @@ func openTestDB(t *testing.T) *sql.DB {
 
 func TestBoxUseCase_IsLarge_5は4以上なのでtrue(t *testing.T) {
 	db := openTestDB(t)
-	useCase := NewBoxUseCase(persistence.NewBoxRepository(db))
+	useCase := NewBoxUseCase(persistence.NewCachedBoxRepository(persistence.NewBoxRepository(db)))
 
 	got, err := useCase.IsLarge(1) // seed data: id=1, number=5
 
@@ -51,7 +55,7 @@ func TestBoxUseCase_IsLarge_5は4以上なのでtrue(t *testing.T) {
 
 func TestBoxUseCase_IsLarge_2は4未満なのでfalse(t *testing.T) {
 	db := openTestDB(t)
-	useCase := NewBoxUseCase(persistence.NewBoxRepository(db))
+	useCase := NewBoxUseCase(persistence.NewCachedBoxRepository(persistence.NewBoxRepository(db)))
 
 	got, err := useCase.IsLarge(2) // seed data: id=2, number=2
 
@@ -65,7 +69,7 @@ func TestBoxUseCase_IsLarge_2は4未満なのでfalse(t *testing.T) {
 
 func TestBoxUseCase_IsLarge_存在しないIDはエラー(t *testing.T) {
 	db := openTestDB(t)
-	useCase := NewBoxUseCase(persistence.NewBoxRepository(db))
+	useCase := NewBoxUseCase(persistence.NewCachedBoxRepository(persistence.NewBoxRepository(db)))
 
 	_, err := useCase.IsLarge(9999) // does not exist
 

@@ -1,6 +1,6 @@
 package application
 
-import "code-practice/go/clean-architecture/repository-interface/bad/persistence"
+import "code-practice/go/clean-architecture/repository-interface/2-di-concrete/persistence"
 
 type MockBoxRepository struct {
 	Box *persistence.Box

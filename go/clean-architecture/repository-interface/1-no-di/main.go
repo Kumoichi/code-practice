@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"code-practice/go/clean-architecture/repository-interface/nodi/application"
+	"code-practice/go/clean-architecture/repository-interface/1-no-di/application"
 )
 
 func main() {

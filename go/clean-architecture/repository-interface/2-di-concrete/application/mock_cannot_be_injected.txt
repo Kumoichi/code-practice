@@ -1,20 +1,20 @@
 このファイルはコンパイルされません（.go拡張子ではありません）。
-「Badの設計ではMockを差し込めない」ことを示すためのサンプルです。
+「2-di-concrete の設計ではMockを差し込めない」ことを示すためのサンプルです。
 
 box_usecase.go で、BoxUseCase は以下のように定義されています。
 
     type BoxUseCase struct {
-        repository *persistence.BoxRepository
+        repository *persistence.CachedBoxRepository
     }
 
-    func NewBoxUseCase(repository *persistence.BoxRepository) *BoxUseCase {
+    func NewBoxUseCase(repository *persistence.CachedBoxRepository) *BoxUseCase {
         ...
     }
 
-NewBoxUseCase の引数は "*persistence.BoxRepository" という
+NewBoxUseCase の引数は "*persistence.CachedBoxRepository" という
 具体的な型で固定されています。interfaceではありません。
 
-ここで、good側と同じようにMockを自作してみます。
+ここで、3-di-interface側と同じようにMockを自作してみます。
 
     type MockBoxRepository struct {
         Box *persistence.Box
@@ -40,16 +40,16 @@ NewBoxUseCase の引数は "*persistence.BoxRepository" という
     //
     // コンパイルエラー:
     // cannot use &MockBoxRepository{…} (value of type *MockBoxRepository)
-    // as *persistence.BoxRepository value in argument to NewBoxUseCase
+    // as *persistence.CachedBoxRepository value in argument to NewBoxUseCase
     //
-    // なぜなら NewBoxUseCase は *persistence.BoxRepository という
-    // 「PostgreSQLの実装そのもの」を要求しており、
+    // なぜなら NewBoxUseCase は *persistence.CachedBoxRepository という
+    // 「PostgreSQLの実装をキャッシュで包んだ構造体そのもの」を要求しており、
     // MockBoxRepository が同じメソッドセットを持っていても
     // 型としては全くの別物だからです。
     //
     // interfaceを挟んでいれば「Find(id int) (*Box, error) を満たすか」
-    // だけが問われますが、Badでは「persistence.BoxRepositoryという
+    // だけが問われますが、ここでは「persistence.CachedBoxRepositoryという
     // 具体的な構造体そのものか」が問われてしまいます。
 
-この結果、Bad側でUseCaseをテストするには、実際にPostgreSQLへ接続する
+この結果、2-di-concrete 側でUseCaseをテストするには、実際にPostgreSQLへ接続する
 box_usecase_test.go のような方法しか残されていません。

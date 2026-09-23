@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"code-practice/go/clean-architecture/repository-interface/good/domain"
+	"code-practice/go/clean-architecture/repository-interface/3-di-interface/domain"
 )
 
 // MockBoxRepositoryはdomain.BoxRepositoryを満たしているので、

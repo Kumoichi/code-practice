@@ -1,16 +1,17 @@
-nodi は「DIをそもそも使わない」アンチパターンです。bad と比べても
-一段階悪い状態になっています。
+1-no-di は「DIをそもそも使わない」アンチパターンです。
+2-di-concrete と比べても、さらに一段階悪い状態になっています。
 
     type BoxUseCase struct {
-        repository *persistence.BoxRepository
+        repository *persistence.CachedBoxRepository
     }
 
     func NewBoxUseCase() *BoxUseCase {
-        return &BoxUseCase{repository: persistence.NewDefaultBoxRepository()}
+        inner := persistence.NewDefaultBoxRepository()
+        return &BoxUseCase{repository: persistence.NewCachedBoxRepository(inner)}
     }
 
 DSNの組み立てやsql.Open自体は persistence.NewDefaultBoxRepository の
-中に移してあります（nodi/persistence/box_repository.go）。ただし、これは
+中に移してあります（1-no-di/persistence/box_repository.go）。ただし、これは
 見た目が短くなっただけで、問題の本質は変わっていません。application は
 結局 persistence という具体的なパッケージ・具体的な関数名を直接
 呼び出しているので、外から何かを差し込む余地は依然としてゼロです。
@@ -19,25 +20,25 @@ DSNの組み立てやsql.Open自体は persistence.NewDefaultBoxRepository の
 受け取るだけか」が本質的な違いだった、ということがこの変更で
 確認できます。
 
-good / bad との違い:
+3つの実装の違い:
 
-  good: NewBoxUseCase(repository domain.BoxRepository)
+  3-di-interface: NewBoxUseCase(repository domain.BoxRepository)
         → interfaceを受け取る。本物もMockも注入できる。
 
-  bad:  NewBoxUseCase(repository *persistence.BoxRepository)
-        → 具体型を受け取る。本物しか注入できないが、少なくとも
+  2-di-concrete:  NewBoxUseCase(repository *persistence.CachedBoxRepository)
+        → 具体型を受け取る。Mockは注入できないが、少なくとも
           「どのDBに繋いだrepositoryを渡すか」は呼び出し側が選べる
           （テスト用DBに向けることもできる）。
 
-  nodi: NewBoxUseCase()
+  1-no-di:        NewBoxUseCase()
         → 何も受け取らない。DB接続そのものをUseCaseが自分で
           os.Getenv("DATABASE_URL") から組み立てる。呼び出し側は
           「どのDBに繋ぐか」を選ぶ余地すらない。
 
-この結果、nodi では:
+この結果、1-no-di では:
 
-  1. Mockを差し込めない（bad と同じ問題）
-  2. テスト用のDBに向けることもできない（bad より悪い）
+  1. Mockを差し込めない（2-di-concrete と同じ問題）
+  2. テスト用のDBに向けることもできない（2-di-concrete より悪い）
   3. BoxUseCase を使う全てのコードが、暗黙的に環境変数
      DATABASE_URL と接続先DBの存在に依存する
   4. UseCase（ビジネスロジック）のコードの中に、DB接続やDSNの

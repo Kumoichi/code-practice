@@ -1,6 +1,5 @@
-// Package persistence is the concrete, PostgreSQL-specific implementation.
-// Unlike "good", there is no domain package here — Box is defined by
-// persistence itself, and application will import this package directly.
+// Package persistence is the only place in "3-di-interface" that is allowed to know
+// about PostgreSQL. It implements domain.BoxRepository.
 package persistence
 
 import (
@@ -9,12 +8,9 @@ import (
 	"fmt"
 
 	_ "github.com/lib/pq"
-)
 
-type Box struct {
-	ID     int
-	Number int
-}
+	"code-practice/go/clean-architecture/repository-interface/3-di-interface/domain"
+)
 
 type BoxRepository struct {
 	db *sql.DB
@@ -24,10 +20,11 @@ func NewBoxRepository(db *sql.DB) *BoxRepository {
 	return &BoxRepository{db: db}
 }
 
-func (r *BoxRepository) Find(id int) (*Box, error) {
+// Find implements domain.BoxRepository.
+func (r *BoxRepository) Find(id int) (*domain.Box, error) {
 	row := r.db.QueryRow(`SELECT id, number FROM boxes WHERE id = $1`, id)
 
-	var box Box
+	var box domain.Box
 	if err := row.Scan(&box.ID, &box.Number); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("box not found: id=%d", id)

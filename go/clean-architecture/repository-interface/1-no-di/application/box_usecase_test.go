@@ -7,7 +7,7 @@ import (
 
 // DIをしていない悪い例。NewBoxUseCase()は引数が0個で、Mockを渡す場所が
 // そもそも存在しない。UseCase(ビジネスロジック)のテストのはずなのに、
-// 直接本物のDBに繋いでテストするしかない。比較: good/application/box_usecase_test.go
+// 直接本物のDBに繋いでテストするしかない。比較: 3-di-interface/application/box_usecase_test.go
 
 func TestBoxUseCase_IsLarge_5は4以上なのでtrue(t *testing.T) {
 	useCase := NewBoxUseCase() // ← 引数なし。DIできないのでMockを渡しようがない

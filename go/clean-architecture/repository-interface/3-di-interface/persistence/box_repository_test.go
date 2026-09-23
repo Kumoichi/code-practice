@@ -10,7 +10,7 @@ import (
 
 // This test hits real PostgreSQL. It requires `docker compose up -d`
 // to have been run from the repository root. Compare with
-// good/application/box_usecase_test.go, which needs no database at all.
+// 3-di-interface/application/box_usecase_test.go, which needs no database at all.
 func openTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 
