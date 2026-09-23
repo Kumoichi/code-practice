@@ -113,24 +113,89 @@ interfaceを使うと、ここまでの「Mockが使えるかどうか」以外�
 
 ### メリット1: 差し替え可能性
 
-`3-di-interface/application/box_usecase.go`は`repository`を外から受け取るだけなので、次のどれを渡してもそのまま動きます。
+これも「interfaceが無いとMockが弾かれる」のときと同じように、**3つの実装すべてに同じ機能を後から足して**比較できるようにしてあります。お題は「キャッシュを追加したい」です。
+
+素の`BoxRepository`をキャッシュで包む`CachedBoxRepository`を用意するところまでは、3つとも共通です。違いは、**それを実際に使わせるために、どこまで書き換える羽目になったか**です。
+
+#### 3-di-interface: application層は1文字も触っていない
 
 ```go
-NewBoxUseCase(persistence.NewBoxRepository(db))                                   // 本番用: 本物のDB
-NewBoxUseCase(&MockBoxRepository{...})                                            // テスト用: Mock
-NewBoxUseCase(persistence.NewCachedBoxRepository(persistence.NewBoxRepository(db))) // キャッシュ付き: 本物のDB + キャッシュ
+// main.go — この1行だけ
+- repository := persistence.NewBoxRepository(db)
++ repository := persistence.NewCachedBoxRepository(persistence.NewBoxRepository(db))
 ```
-
-3つ目は架空の例ではなく、実際にこのリポジトリで起きたことです。あとから「キャッシュを追加したい」となったとき、変更したのは`persistence`パッケージに`CachedBoxRepository`を1つ足したことと、`main.go`で渡す値を差し替えたことだけでした。
 
 ```go
-// main.go: 変更前
-repository := persistence.NewBoxRepository(db)
-// main.go: 変更後
-repository := persistence.NewCachedBoxRepository(persistence.NewBoxRepository(db))
+// application/box_usecase.go — 変更なし
+type BoxUseCase struct {
+    repository domain.BoxRepository   // ← 元のまま
+}
+
+func NewBoxUseCase(repository domain.BoxRepository) *BoxUseCase {  // ← 元のまま
+    return &BoxUseCase{repository: repository}
+}
 ```
 
-`3-di-interface/application/box_usecase.go`と`3-di-interface/domain/box_repository.go`は、この変更で**1行も書き換えていません**。`BoxUseCase`は「`Find`できる何か」を受け取るとしか約束していないので、渡ってくる実体が「本物のDB」から「キャッシュ付きの本物のDB」に変わっても、何も気づかず動き続けます。これが「差し替え可能性」の実例です。
+テストコードも変更していません。`CachedBoxRepository`も`Find`を持っている＝`domain.BoxRepository`を満たしているので、`BoxUseCase`から見れば渡ってくるものは何も変わっていないからです。
+
+#### 2-di-concrete: application層の型定義とテストを書き換えた
+
+```go
+// main.go
+- repository := persistence.NewBoxRepository(db)
++ repository := persistence.NewCachedBoxRepository(persistence.NewBoxRepository(db))
+```
+
+```go
+// application/box_usecase.go — 型を2箇所書き換える必要があった
+  type BoxUseCase struct {
+-     repository *persistence.BoxRepository
++     repository *persistence.CachedBoxRepository
+  }
+
+- func NewBoxUseCase(repository *persistence.BoxRepository) *BoxUseCase {
++ func NewBoxUseCase(repository *persistence.CachedBoxRepository) *BoxUseCase {
+      return &BoxUseCase{repository: repository}
+  }
+```
+
+```go
+// application/box_usecase_test.go — 引数の型が変わったので呼び出し3箇所すべて
+- useCase := NewBoxUseCase(persistence.NewBoxRepository(db))
++ useCase := NewBoxUseCase(persistence.NewCachedBoxRepository(persistence.NewBoxRepository(db)))
+```
+
+DIはしているのに、**ビジネスロジックの層とそのテストにまで変更が波及**しました。`*persistence.BoxRepository`という構造体を名指ししていたせいで、「別の構造体で包む」という変更がそのまま型の不一致になるからです。
+
+#### 1-no-di: 型に加えてコンストラクタの中身まで書き換えた
+
+```go
+// application/box_usecase.go
+  type BoxUseCase struct {
+-     repository *persistence.BoxRepository
++     repository *persistence.CachedBoxRepository
+  }
+
+  func NewBoxUseCase() *BoxUseCase {
+-     return &BoxUseCase{repository: persistence.NewDefaultBoxRepository()}
++     inner := persistence.NewDefaultBoxRepository()
++     return &BoxUseCase{repository: persistence.NewCachedBoxRepository(inner)}
+  }
+```
+
+型定義だけでなく、**組み立ての手順そのもの**がUseCaseの中にあるので、組み立て方が変わればUseCaseが変わります。
+
+#### 並べるとこうなる
+
+| | main.go | application層 | テスト |
+|---|---|---|---|
+| 3-di-interface | 1行 | **変更なし** | **変更なし** |
+| 2-di-concrete | 1行 | 型を2箇所 | 3箇所 |
+| 1-no-di | （そもそも無い） | 型1箇所＋処理2行 | （元々テスト不能） |
+
+やりたかったことは3つとも「キャッシュを挟む」というまったく同じ1つの変更です。それなのに、`repository`フィールドを`domain.BoxRepository`と書いたか`*persistence.BoxRepository`と書いたかという**たった1行の違い**で、触るファイル数がここまで変わります。
+
+実際のコードは [1-no-di](go/clean-architecture/repository-interface/1-no-di/application/box_usecase.go) / [2-di-concrete](go/clean-architecture/repository-interface/2-di-concrete/application/box_usecase.go) / [3-di-interface](go/clean-architecture/repository-interface/3-di-interface/application/box_usecase.go) にそれぞれ置いてあるので、見比べてみてください。
 
 ### メリット2: 責務の分離
 
@@ -170,12 +235,6 @@ func NewBoxUseCase(repository domain.BoxRepository) *BoxUseCase {
 
 ## 3つの実装を全部並べて見る
 
-ここまでは断片ごとに比較してきましたが、**3つの実装の全コードを層ごとに並べた比較**を [comparison.md](go/clean-architecture/repository-interface/comparison.md) に用意しました。
+ここまでは「Mockが弾かれるか」「キャッシュ追加で何を触るか」のように、**論点ごとに**3つを比較してきました。
 
-特に「同じ『キャッシュを追加したい』という要求に対して、3つそれぞれが何ファイル・何行書き換える羽目になったか」の比較は、interfaceの有無が実際の作業量にどう効くかが一番はっきり出る部分です。
-
-| | main.go | application層 | テスト | 新規ファイル |
-|---|---|---|---|---|
-| 3-di-interface | 1行 | **変更なし** | **変更なし** | 1つ |
-| 2-di-concrete | 1行 | 型を2箇所 | 3箇所 | 1つ |
-| 1-no-di | （なし） | 型1箇所＋処理2行 | （元々テスト不能） | （同ファイル内に追加） |
+これとは別に、**3つのapplication層の全文を層ごとに並べた比較**を [comparison.md](go/clean-architecture/repository-interface/comparison.md) に用意しています。`IsLarge`の中身は3つとも1文字も違わず、違うのは`import`先と`repository`フィールドの型だけ、という事実から出発して、テストの書き方の差や依存の向きの図まで通しで追える構成にしてあります。
