@@ -2,13 +2,14 @@
 
 テーマ：**UseCaseからInfrastructureの具象Repositoryを直接参照する場合と、Repository interfaceを挟む場合の違い**
 
-3つのディレクトリすべてが、まったく同じ機能（箱の中の数字を取得して4以上かどうか判定する `IsLarge(id int) (bool, error)`）を実装しています。実装が違うだけで、外から見た挙動は同じです。
+3つのディレクトリ（と、その発展形の`4-di-wire`）すべてが、まったく同じ機能（箱の中の数字を取得して4以上かどうか判定する `IsLarge(id int) (bool, error)`）を実装しています。実装が違うだけで、外から見た挙動は同じです。
 
 | ディレクトリ | 設計 | `NewBoxUseCase`の形 |
 |---|---|---|
 | [1-no-di](1-no-di/) | DIをしない | `NewBoxUseCase()` |
 | [2-di-concrete](2-di-concrete/) | DIするが、具体型で受け取る | `NewBoxUseCase(repository *persistence.CachedBoxRepository)` |
 | [3-di-interface](3-di-interface/) | DIして、interfaceで受け取る | `NewBoxUseCase(repository domain.BoxRepository)` |
+| [4-di-wire](4-di-wire/) | 3-di-interfaceと同じ設計で、組み立てをWireで生成する | `NewBoxUseCase(repository domain.BoxRepository)`（同じ） |
 
 **3つの全コードを並べた比較は [comparison.md](comparison.md) にあります。** まずはそちらを読むのが分かりやすいです。
 
@@ -147,6 +148,7 @@ go test $(go list ./... | grep -v trymock)
 go run ./go/clean-architecture/repository-interface/1-no-di
 go run ./go/clean-architecture/repository-interface/2-di-concrete
 go run ./go/clean-architecture/repository-interface/3-di-interface
+go run ./go/clean-architecture/repository-interface/4-di-wire
 ```
 
 ## 演習
@@ -196,3 +198,25 @@ VS Codeで `BoxUseCase` の `repository` フィールドから `Find` の呼び�
 - 1-no-diでは `repository` フィールドを外から渡す箇所自体が存在しません（コンストラクタの中で完結しています）。
 
 このジャンプ先の違いが、「UseCaseが何を知っているか」の違いをそのまま表しています。
+
+## 4-di-wire（3-di-interfaceの組み立てをWireで生成する）
+
+```text
+wire.go（injector: 何が欲しいか・材料は何かを宣言）
+   ↓ wireコマンド
+wire_gen.go（生成: 組み立てコード。手で編集しない）
+   ↓
+main.go は InitializeBoxUseCase(db) を呼ぶだけ
+```
+
+`domain`・`application`・`persistence`は3-di-interfaceと同じで、変わったのは`main.go`の組み立て部分だけです。
+
+- [4-di-wire/wire.go](4-di-wire/wire.go): providerを並べただけのinjector（`//go:build wireinject`が付いているので通常のビルドには含まれない）
+- [4-di-wire/wire_gen.go](4-di-wire/wire_gen.go): `wire`コマンドが生成したコード。3-di-interfaceの`main.go`で手書きしていた組み立てと同じ内容
+
+`wire.go`を変更したら、`4-di-wire`ディレクトリで次を実行して`wire_gen.go`を再生成します。
+
+```bash
+cd go/clean-architecture/repository-interface/4-di-wire
+go run github.com/google/wire/cmd/wire@v0.7.0
+```

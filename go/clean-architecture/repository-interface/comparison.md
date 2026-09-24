@@ -321,3 +321,20 @@ repository domain.BoxRepository               // interface: Findを持つもの�
 ```
 
 「interfaceを使うと良い」という抽象的な話ではなく、**この1行の書き方次第で、後から機能を足すときに何ファイル書き換える羽目になるかが決まる**、というのがここで確認できることです。
+
+---
+
+## 補足: 4-di-wire（3-di-interfaceの組み立てをWireに任せた版）
+
+ここまでの比較は3つで完結していますが、`4-di-wire`は`3-di-interface`と**同じ設計**で、`main.go`の組み立て部分だけをWireで生成するようにしたものです。`domain`・`application`・`persistence`は`3-di-interface`とimportパス以外まったく同じで、違いは組み立ての書き方だけです。
+
+```go
+// 3-di-interface/main.go — 手で組み立てる
+repository := persistence.NewCachedBoxRepository(persistence.NewBoxRepository(db))
+useCase := application.NewBoxUseCase(repository)
+
+// 4-di-wire/main.go — 生成されたinjectorに任せる
+useCase := InitializeBoxUseCase(db)
+```
+
+Wireの詳細は [explanation.md](../../../explanation.md) の「Wireとは」を参照してください。

@@ -29,7 +29,8 @@ code-practice/
             ├── comparison.md        ← 3実装の全コード比較
             ├── 1-no-di/             ← DIをしない
             ├── 2-di-concrete/       ← DIするが具体型で受け取る
-            └── 3-di-interface/      ← DIしてinterfaceで受け取る
+            ├── 3-di-interface/      ← DIしてinterfaceで受け取る
+            └── 4-di-wire/           ← 3-di-interfaceの組み立てをWireで生成する
 ```
 
 今後、`go/concurrency/` や `sql/transaction/` のような形でテーマを追加していく想定です。
